@@ -2,7 +2,7 @@
 /*	Lusíadas!
  *
  *	1. Generate N files, each corresponding to a stanza.
- *  PARALLEL
+ *	PARALLEL
  *	2. At each space or \n, generate a random number r between 1 and 100.
  *	3. There is a "p" chance that a string "aaaa" will be added at each space or \n.
  *	4. If r < p, add "aaaa" at space or \n.
@@ -15,29 +15,34 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <string.h>
 #include "lusiadas.h"
 
+int prob;
 int total_stanzas;
 int nsic[NC + 1];
 
-void prepare_text(int prob) {
+void prepare_files() {
 
 	/***
 	 *
 	 * This function will read files containing the "cantos" of the
-	 * Lusíadas and will save each stanza in a different file named
-	 * "cantoM_stanzaN", where M is the "canto" number and
-	 * N is the stanza number.
+	 * Lusíadas and will save a copy of each stanza in a different
+	 * file named "/path/to/old/cantoM_stanzaN.txt", where M is the
+	 * "canto" number and N is the stanza number.
 	 *
+	 * It will also save another copy of the files in
+	 * "/path/to/new/new_cantoM_stanzaN.txt".
+	 * 
 	***/
 
-	int lnumber, number, stanza, canto; // line number, lines in stanza, stanza number
+	int lnumber, stanza, canto;
 	int c;
-	char line[60], stanza_filename[70], canto_filename[70];
-	char new_stanza_filename[70], new_canto_filename[70];
+	char line[80];
+	char stanza_filename[70], canto_filename[70], new_stanza_filename[70];
 	FILE *stanza_file, *canto_file, *new_stanza_file;
 
-//	void create_new_stanza(int prob, FILE *sfile, char *sfilename);
+//	void old_create_new_stanza(FILE *sfile, char sfname[70]);
 
 	for (canto = 1; canto <= NC; canto++) {
 		sprintf(canto_filename,
@@ -45,6 +50,7 @@ void prepare_text(int prob) {
 		canto_file = fopen(canto_filename, "r");
 
 		while ((c = getc(canto_file)) != EOF) {
+//		while (!feof(canto_file)) {
 			fscanf(canto_file, "%d\n", &stanza);
 			sprintf(stanza_filename,
 				"/home/gustavo/lusiadas/stanzas/old/canto%02d_stanza%04d.txt",
@@ -55,23 +61,23 @@ void prepare_text(int prob) {
 			sprintf(new_stanza_filename,
 				"/home/gustavo/lusiadas/stanzas/new/new_canto%02d_stanza%04d.txt",
 					canto, stanza);
-			new_stanza_file = fopen(new_stanza_filename, "rw");
+			new_stanza_file = fopen(new_stanza_filename, "w+");
 
 			for (lnumber = 0; lnumber < LIS; lnumber ++) {
-				fgets(line, 60, canto_file);
+				fgets(line, 80, canto_file);
 				fprintf(stanza_file, "%s", line);
 				fprintf(new_stanza_file, "%s", line);
 			}
 
-//			create_new_stanza(prob, new_stanza_file, new_stanza_filename);
+//			old_create_new_stanza(new_stanza_file, new_stanza_filename);
 
 			fclose(stanza_file);
 			fclose(new_stanza_file);
-			total_stanzas++;
-	    }
+		}
 
 		fclose(canto_file);
 		nsic[canto] = stanza;
+		total_stanzas += nsic[canto];
 		printf("Canto %2d: %3d stanzas\n", canto, nsic[canto]);
 	}
 
@@ -90,84 +96,131 @@ int rand_num() {
 
 	int number;
 
-	srand(time(NULL));
 	number = rand() % 100 + 1;
 
 	return number;
 }
 
-/* USE THIS ONE
-void create_new_stanza(int prob, FILE *sfile, char *sfilename) {
+/*
+void old_create_new_stanza(FILE *sfile) {
 
 	int c, number;
 
+	// This fails because it will overwrite whatever is after ' '
+	// Must write a function that reads line by line and replaces
+	
+	fseek(sfile, 0, SEEK_SET);
 	while ((c = getc(sfile)) != EOF) {
-		if (c == ' ' || c == '\n') {
+		if (c == ' ') {
 			number = rand_num();
 			if (number <= prob) {
-				if (c == ' ')
-					fprintf(sfile, " aaaa ");
-				else if (c == '\n')
-					fprintf(sfile, " aaaa\n");
-				printf("%s\n", sfilename);
+				fprintf(sfile, "aaaa ");
 			}
 		}
 	}
 }
-
 */
 
-/*
-void create_new_stanza(int prob) {
+void create_new_stanza() {
 
-	int number, c, stanza, canto;
-	char new_stanza_filename[70];
-	FILE *new_stanza_file;
+	/* 
+	 * taken from here:
+	 * http://see-programming.blogspot.com.br/2013/07/c-program-to-replace-word-in-file.html
+	 * 
+	 * Must only fix probability.
+	 */
 
-	// get old stanza (they've already been copied to new_stanza, so we will work on these)
+	FILE *sf, *fp2;
+	char sfname[100],  temp[] = "temp.txt";
+	char line[100];
+	char space[] = " ", replace[] = " aaaa ";
+	char *ptr1, *ptr2;
+	
+	int canto, stanza, number;
+
 	for (canto = 1; canto <= NC; canto++) {
 		for (stanza = 1; stanza <= nsic[canto]; stanza++) {
-			sprintf(new_stanza_filename,
+			// get file
+			sprintf(sfname,
 				"/home/gustavo/lusiadas/stanzas/new/new_canto%02d_stanza%04d.txt",
 					canto, stanza);
-			new_stanza_file = fopen(new_stanza_filename, "w");
+			sf = fopen(sfname, "r");
+			fp2 = fopen(temp, "w");
 
-			// read old_stanza and see if we will add "aaaa"
-			while ((c = getc(new_stanza_file)) != EOF) {
-				if (c == " " || c == "\n") {
+			while (!feof(sf)) {
+				strcpy(line, "\0");
+
+				// read line by line from the input file
+				fgets(line, 100, sf);
+
+                if (strstr(line, space)) {
 					number = rand_num();
-					if (number < prob) {
-						if (c == " ")
-							fprintf(new_stanza_file, " aaaa ");
-						else if (c == "\n")
-							fprintf(new_stanza_file, " aaaa\n");
-					}
+//					if (number <= prob) {
+						ptr2 = line;
+						while (ptr1 = strstr(ptr2, space)) {
+
+							// letters present before the word to be replaced
+							while (ptr2 != ptr1) {
+								fputc(*ptr2, fp2);
+								ptr2++;
+							}
+
+							// skip the word to be replaced
+							ptr1 += strlen(space);
+							fprintf(fp2, "%s", replace);
+							ptr2 = ptr1;
+						}
+	
+						// characters present after the word to be replaced
+						while (*ptr2 != '\0') {
+							fputc(*ptr2, fp2);
+							ptr2++;
+						}
+//					}
+
+				} else {
+					// current scanned line doesn't have the word to be replaced
+					fputs(line, fp2);
 				}
 			}
+
+			// close the opened files
+			fclose(sf);
+			fclose(fp2);
+
+			// remove the input file
+			remove(sfname);
+			// rename temporary file name to input file name
+			rename(temp, sfname);
 		}
 	}
 }
-*/
+
+void create_new_canto() {
+
+}
+
 
 int main()
 {
-
-	int prob; // probability of generating a string "aaaa" at spaces and \n. Must be between 1 and 100
+	extern int prob;
 	extern int total_stanzas;
 	extern int nsic[NC + 1];
 
+	srand(time(NULL));
 	total_stanzas = 0;
 
-	prob = 80;
+	prob = 7;
 	if (prob < 1 || prob > 100) {
 		printf("You put prob = %d, but it must be between 1 and 100.\n", prob);
 		printf("(yes, there's always a chance!)\n");
 		return (1);
 	}
 
-	prepare_text(prob);
-
-//	create_new_stanza(prob);
+	prepare_files();
+	create_new_stanza();
+//	create_new_canto();
+//	create_new_lusiadas();
 
 	return 0;
 }
