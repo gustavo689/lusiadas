@@ -44,47 +44,34 @@ void prepare_files() {
 	char stanza_filename[70], canto_filename[70], new_stanza_filename[70];
 	FILE *stanza_file, *canto_file, *new_stanza_file;
 
-//	void old_create_new_stanza(FILE *sfile, char sfname[70]);
-
-	for (canto = 0; canto < NC; canto++) {
+	stanza = 0;
+	for (canto = 1; canto <= NC; canto++) {
 		sprintf(canto_filename,
-			"/home/gustavo/lusiadas/cantos/canto%02d.txt", canto + 1);
+			"/home/gustavo/lusiadas/cantos/canto%02d.txt", canto);
 		canto_file = fopen(canto_filename, "r");
 
 		while ((c = getc(canto_file)) != EOF) {
-//		while (!feof(canto_file)) {
-			fscanf(canto_file, "%d\n", &stanza);
+			fscanf(canto_file, "%d\n", &nsic[canto]);
 			sprintf(stanza_filename,
-				"/home/gustavo/lusiadas/stanzas/old/canto%02d_stanza%04d.txt",
-					canto + 1, stanza);
+				"/home/gustavo/lusiadas/stanzas/test/stanza%d.txt", stanza + 1);
 			stanza_file = fopen(stanza_filename, "w");
-
-			// create new files
-			sprintf(new_stanza_filename,
-				"/home/gustavo/lusiadas/stanzas/new/new_canto%02d_stanza%04d.txt",
-					canto + 1, stanza);
-			new_stanza_file = fopen(new_stanza_filename, "w+");
 
 			for (lnumber = 0; lnumber < LIS; lnumber ++) {
 				fgets(line, 80, canto_file);
 				fprintf(stanza_file, "%s", line);
-				fprintf(new_stanza_file, "%s", line);
 			}
-
-//			old_create_new_stanza(new_stanza_file, new_stanza_filename);
-
+			stanza++;
 			fclose(stanza_file);
-			fclose(new_stanza_file);
 		}
 
 		fclose(canto_file);
-		nsic[canto] = stanza;
 		total_stanzas += nsic[canto];
 		printf("Canto %2d: %3d stanzas\n", canto, nsic[canto]);
 	}
 
 	printf("Number of stanzas: %d\n", total_stanzas);
 }
+
 
 int rand_num() {
 
@@ -103,27 +90,6 @@ int rand_num() {
 	return number;
 }
 
-/*
-
-	// This fails because it will overwrite whatever is after ' '
-	// Must write a function that reads line by line and replaces
-
-
-void old_create_new_stanza(FILE *sfile) {
-
-	int c, number;
-	
-	fseek(sfile, 0, SEEK_SET);
-	while ((c = getc(sfile)) != EOF) {
-		if (c == ' ') {
-			number = rand_num();
-			if (number <= prob) {
-				fprintf(sfile, "aaaa ");
-			}
-		}
-	}
-}
-*/
 
 void create_new_stanza() {
 
@@ -142,71 +108,58 @@ void create_new_stanza() {
 	char space[] = " ", replace[] = ", aaaaa, ";
 	char *ptr1, *ptr2;
 	
-	int canto, stanza, number;
+	int stanza, number;
 
-	for (canto = 0; canto < NC; canto++) {
-		for (stanza = 0; stanza < nsic[canto]; stanza++) {
-			// get file
-			sprintf(sfname,
-				"/home/gustavo/lusiadas/stanzas/new/new_canto%02d_stanza%04d.txt",
-					canto + 1, stanza + 1);
-			sf = fopen(sfname, "r");
-			fp2 = fopen(temp, "w");
+	for (stanza = 1; stanza <= total_stanzas; stanza++) {
+		// get file
+		sprintf(sfname,
+			"/home/gustavo/lusiadas/stanzas/test/stanza%d.txt", stanza);
+		sf = fopen(sfname, "r");
+		fp2 = fopen(temp, "w");
 
-			while (!feof(sf)) {
-				strcpy(line, "\0");
+		while (!feof(sf)) {
+			strcpy(line, "\0");
 
-				// read line by line from the input file
-				fgets(line, 100, sf);
+			// read line by line from the input file
+			fgets(line, 100, sf);
 
-				if (strstr(line, space)) {
-					number = rand_num();
-					if (number <= prob) {
-						ptr2 = line;
-						while (ptr1 = strstr(ptr2, space)) {
+			if (strstr(line, space)) {
+				ptr2 = line;
+				while (ptr1 = strstr(ptr2, space)) {
 
-							// letters present before the word to be replaced
-							while (ptr2 != ptr1) {
-								fputc(*ptr2, fp2);
-								ptr2++;
-							}
-
-							// skip the word to be replaced
-							ptr1 += strlen(space);
-							fprintf(fp2, "%s", replace);
-							ptr2 = ptr1;
-						}
-	
-						// characters present after the word to be replaced
-						while (*ptr2 != '\0') {
-							fputc(*ptr2, fp2);
-							ptr2++;
-						}
-					} else {
-						fputs(line, fp2);
+					// letters present before the word to be replaced
+					while (ptr2 != ptr1) {
+						fputc(*ptr2, fp2);
+						ptr2++;
 					}
 
-
-				} else {
-					// current scanned line doesn't have the word to be replaced
-					fputs(line, fp2);
+					// skip the word to be replaced
+					ptr1 += strlen(space);
+					fprintf(fp2, "%s", replace);
+					ptr2 = ptr1;
 				}
+	
+				// characters present after the word to be replaced
+				while (*ptr2 != '\0') {
+					fputc(*ptr2, fp2);
+					ptr2++;
+				}
+
+			} else {
+				// current scanned line doesn't have the word to be replaced
+				fputs(line, fp2);
 			}
-
-			// close the opened files
-			fclose(sf);
-			fclose(fp2);
-
-			// remove the input file
-			remove(sfname);
-			// rename temporary file name to input file name
-			rename(temp, sfname);
 		}
+
+		// close the opened files
+		fclose(sf);
+		fclose(fp2);
+
+		// remove the input file
+		remove(sfname);
+		// rename temporary file name to input file name
+		rename(temp, sfname);
 	}
-}
-
-void create_new_canto() {
-
 }
 
 
@@ -228,8 +181,6 @@ int main()
 
 	prepare_files();
 	create_new_stanza();
-//	create_new_canto();
-//	create_new_lusiadas();
 
 	return 0;
 }
